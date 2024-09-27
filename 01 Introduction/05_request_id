@@ -1,0 +1,32 @@
+from openai import OpenAI
+import asyncio
+
+# Initialize the OpenAI client
+client = OpenAI()
+
+
+# Async function to call the API
+async def main():
+    try:
+        completion = await client.chat.completions.create(
+            messages=[{"role": "user", "content": "Say this is a test"}], model="gpt-4"
+        )
+        # Print the entire response for debugging
+        print("Completion Response:", completion)
+
+        # Check if the _request_id property exists and print it
+        if hasattr(completion, "_request_id"):
+            print("Request ID:", completion._request_id)
+        else:
+            print("Request ID not found in the response.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
+# Check if the event loop is already running
+try:
+    loop = asyncio.get_running_loop()
+    task = loop.create_task(main())
+except RuntimeError:
+    asyncio.run(main())
