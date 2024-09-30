@@ -93,9 +93,9 @@ def run_assistant(thread):
 
 new_message = generate_response("What is urban rainwater harvesting?", "123")
 
-new_message = generate_response(
-    "What is indicator and pathogenic microorganisms concentrations found in untreated harvested rainwater?",
-    "123",
-)
+# new_message = generate_response(
+#     "What is indicator and pathogenic microorganisms concentrations found in untreated harvested rainwater?",
+#     "123",
+# )
 
-new_message = generate_response("What was my first question?", "123")
+# new_message = generate_response("What was my first question?", "123")

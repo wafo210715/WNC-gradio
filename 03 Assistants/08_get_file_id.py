@@ -2,7 +2,6 @@ from openai import OpenAI
 import shelve
 import os
 import time
-import gradio as gr
 
 client = OpenAI()
 
@@ -49,7 +48,6 @@ def generate_response(message_body, user_id):
         thread = client.beta.threads.create()
         store_thread(user_id, thread.id)
         thread_id = thread.id
-
     # Otherwise, retrieve the existing thread
     else:
         print(f"Retrieving existing thread for user_id {user_id}")
@@ -62,9 +60,14 @@ def generate_response(message_body, user_id):
         content=message_body,
     )
 
-    # Run the assistant and get the new message
-    new_message = run_assistant(thread)
+    # Run the assistant and get the new message and file IDs
+    new_message, file_ids = run_assistant(thread)
     print(f"To {user_id}:", new_message)
+
+    print("\nExtracted file IDs:")
+    for file_id in file_ids:
+        print(file_id)
+
     return new_message
 
 
@@ -85,44 +88,43 @@ def run_assistant(thread):
         time.sleep(0.5)
         run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
 
-    # Retrieve the Messages from https://platform.openai.com/docs/api-reference/messages/listMessages
+    # Retrieve the Messages
     messages = client.beta.threads.messages.list(thread_id=thread.id)
-    new_message = messages.data[0].content[0].text.value
-    print(f"Generated message: {new_message}")
-    return new_message
+
+    # Get the latest message
+    message = messages.data[0]
+    new_message = message.content[0].text.value
+
+    # Extract file IDs
+    file_ids = set()
+    for message in messages.data:
+        if message.content and isinstance(message.content, list):
+            for content_block in message.content:
+                if hasattr(content_block, "text") and hasattr(
+                    content_block.text, "annotations"
+                ):
+                    for annotation in content_block.text.annotations:
+                        if hasattr(annotation, "file_citation") and hasattr(
+                            annotation.file_citation, "file_id"
+                        ):
+                            file_ids.add(annotation.file_citation.file_id)
+    file_ids = list(file_ids)
+
+    return new_message, file_ids
 
 
-def chat_interface(message, state):
-    user_id = "gradio_user"  # We'll use a fixed user ID for simplicity
-    response = generate_response(message, user_id)
-    state.append((message, response))
-    return state, state
+# Assuming 'messages' is your SyncCursorPage[Message] object
+# file_ids = extract_file_ids(messages)
+# print("Extracted file IDs:")
+# for file_id in file_ids:
+#     print(file_id)
 
 
-# Create the Gradio interface
-with gr.Blocks() as demo:
-    gr.Markdown(
-        """
-        # Chichester's Festival of Research Chatbot
-        Welcome to the Chichester's Research Fairs with Workshops!
-        """
-    )
-    chatbot = gr.Chatbot()
-    msg = gr.Textbox(label="Type your message here")
-    clear = gr.Button("Clear")
+new_message = generate_response("What is urban rainwater harvesting?", "123")
 
-    msg.submit(chat_interface, [msg, chatbot], [chatbot, chatbot]).then(
-        lambda: "", None, msg
-    )
-    clear.click(lambda: None, None, chatbot, queue=False)
-
-if __name__ == "__main__":
-    demo.launch()
-
-# Comment out or remove the following lines:
-# new_message = generate_response("What is urban rainwater harvesting?", "123")
 # new_message = generate_response(
 #     "What is indicator and pathogenic microorganisms concentrations found in untreated harvested rainwater?",
 #     "123",
 # )
+
 # new_message = generate_response("What was my first question?", "123")
