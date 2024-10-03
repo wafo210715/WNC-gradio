@@ -133,11 +133,12 @@ def generate_response(message_body, user_id):
 def record_conversation_and_feedback(
     thread_id, user_id, user_message, assistant_response, feedback=None
 ):
-    filename = "conversation_records.csv"
+    csv_filename = "conversation_records.csv"
+    json_filename = "conversation_records.json"
 
-    # Create the CSV file with headers if it doesn't exist
-    if not os.path.exists(filename):
-        with open(filename, "w", newline="", encoding="utf-8") as f:
+    # Create CSV file if it doesn't exist
+    if not os.path.exists(csv_filename):
+        with open(csv_filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(
                 [
@@ -150,19 +151,40 @@ def record_conversation_and_feedback(
                 ]
             )
 
-    # Append the new record
-    with open(filename, "a", newline="", encoding="utf-8") as f:
+    # Prepare the record
+    timestamp = datetime.now().isoformat()
+    record = [timestamp, thread_id, user_id, user_message, assistant_response, feedback]
+
+    # Append to CSV
+    with open(csv_filename, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(
-            [
-                datetime.now().isoformat(),
-                thread_id,
-                user_id,
-                user_message,
-                assistant_response,
-                feedback,
-            ]
-        )
+        writer.writerow(record)
+
+    # Append to JSON
+    json_record = {
+        "Timestamp": timestamp,
+        "Thread ID": thread_id,
+        "User ID": user_id,
+        "User Message": user_message,
+        "Assistant Response": assistant_response,
+        "Feedback": feedback,
+    }
+
+    if os.path.exists(json_filename):
+        with open(json_filename, "r+", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError:
+                data = []
+            data.append(json_record)
+            f.seek(0)
+            json.dump(data, f, indent=2)
+            f.truncate()
+    else:
+        with open(json_filename, "w", encoding="utf-8") as f:
+            json.dump([json_record], f, indent=2)
+
+    print(f"Record added to {csv_filename} and {json_filename}")
 
 
 # Gradio interface function
@@ -212,7 +234,7 @@ with gr.Blocks(
     #image-container { 
         position: relative; 
         width: 100%; 
-        max-width: 1000px; 
+        max-width: 1400px; 
         margin: 20px auto 0; 
     }
     #image-display {
@@ -245,7 +267,7 @@ with gr.Blocks(
         message = gr.Textbox(lines=2, placeholder="Enter your message here...")
         user_id = gr.Textbox(placeholder="Enter user ID (e.g., 123)")
         submit_btn = gr.Button("Submit")
-        output = gr.Textbox(label="AI Response", lines=10)
+        output = gr.Textbox(label="AI Response", lines=5)
 
         # Add feedback options
         feedback = gr.Radio(
